@@ -1,0 +1,48 @@
+{
+ "stillSecs": 3.0,
+ "alert_rate_by_activity": {
+  "arm_wave": 0.738,
+  "fall": 0.662,
+  "jump": 0.525,
+  "run": 0.1,
+  "squat": 0.762,
+  "turn": 0.325,
+  "walk": 0.013
+ },
+ "event_outcomes_by_activity": {
+  "arm_wave": {
+   "fall": 59,
+   "moved_again": 10,
+   "walking": 1
+  },
+  "fall": {
+   "fall": 53,
+   "moved_again": 20,
+   "walking": 3
+  },
+  "jump": {
+   "fall": 42,
+   "moved_again": 29,
+   "walking": 6
+  },
+  "run": {
+   "moved_again": 38,
+   "walking": 17,
+   "fall": 8
+  },
+  "squat": {
+   "fall": 61,
+   "moved_again": 22
+  },
+  "turn": {
+   "fall": 26,
+   "moved_again": 21,
+   "walking": 11
+  },
+  "walk": {
+   "walking": 44,
+   "moved_again": 45,
+   "fall": 1
+  }
+ }
+}

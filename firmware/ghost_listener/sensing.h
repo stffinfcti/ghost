@@ -265,9 +265,11 @@ class Sensor {
       double mS = ss / N, sdS = sqrt(fmax(0.0, sss / N - mS * mS));
       double mD = sd / N, sdD = sqrt(fmax(0.0, ssd / N - mD * mD));
       // Starting thresholds from the empty room's own noise. Tuned later on real recordings.
-      cfg.motionTh = (float)fmax(fmax(mM * 2.0, mM + 6 * sdM), 0.01);
+      // Multipliers come from ESP-Fi HAR recordings (ml/README.md): a fall's burst is
+      // only about 2.3x the quiet level, so 1.6x catches 98% of falls there.
+      cfg.motionTh = (float)fmax(fmax(mM * 1.6, mM + 4 * sdM), 0.005);
       cfg.devTh = (float)fmax(fmax(mD * 3.0, mD + 6 * sdD), 0.004);
-      cfg.spikeTh = (float)fmax(cfg.motionTh * 2.5, mS + 12 * sdS);
+      cfg.spikeTh = (float)fmax(mS * 1.6, mS + 6 * sdS);
       calibrating = false;
       phase = IDLE;
     }

@@ -1,0 +1,15 @@
+{
+ "fall_recall": 0.725,
+ "false_alarm_rate_non_falls": 0.010416666666666666,
+ "precision": 0.9206349206349206,
+ "flagged_as_fall_by_activity": {
+  "arm_wave": 0.0,
+  "fall": 0.725,
+  "jump": 0.025,
+  "run": 0.0,
+  "squat": 0.025,
+  "turn": 0.0125,
+  "walk": 0.0
+ },
+ "seven_activity_accuracy": 0.7375
+}

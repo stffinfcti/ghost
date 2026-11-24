@@ -1,0 +1,95 @@
+{
+ "clips": 560,
+ "falls": 80,
+ "people": 8,
+ "fall_recall": 0.7375,
+ "precision": 0.2706422018348624,
+ "false_alarm_rate_non_falls": 0.33125,
+ "accuracy": 0.6785714285714286,
+ "flagged_as_fall_by_activity": {
+  "arm_wave": 0.4,
+  "fall": 0.7375,
+  "jump": 0.3375,
+  "run": 0.1125,
+  "squat": 0.5,
+  "turn": 0.45,
+  "walk": 0.1875
+ },
+ "per_person_fall_recall": {
+  "1": 0.9,
+  "2": 1.0,
+  "3": 1.0,
+  "4": 0.8,
+  "5": 0.2,
+  "6": 0.7,
+  "7": 0.8,
+  "8": 0.5
+ },
+ "feature_medians": {
+  "arm_wave": {
+   "peak_ratio": 3.144,
+   "burst_secs": 0.95,
+   "post_ratio": 1.031,
+   "pre_ratio": 1.03,
+   "shift": 5.535,
+   "peak_time": 3.5
+  },
+  "fall": {
+   "peak_ratio": 2.34,
+   "burst_secs": 0.7,
+   "post_ratio": 1.015,
+   "pre_ratio": 1.085,
+   "shift": 33.976,
+   "peak_time": 2.75
+  },
+  "jump": {
+   "peak_ratio": 2.55,
+   "burst_secs": 0.4,
+   "post_ratio": 1.042,
+   "pre_ratio": 1.022,
+   "shift": 10.819,
+   "peak_time": 3.6
+  },
+  "run": {
+   "peak_ratio": 7.316,
+   "burst_secs": 2.3,
+   "post_ratio": 1.08,
+   "pre_ratio": 1.009,
+   "shift": 18.96,
+   "peak_time": 4.3
+  },
+  "squat": {
+   "peak_ratio": 2.66,
+   "burst_secs": 0.7,
+   "post_ratio": 1.038,
+   "pre_ratio": 1.026,
+   "shift": 40.364,
+   "peak_time": 3.5
+  },
+  "turn": {
+   "peak_ratio": 3.45,
+   "burst_secs": 0.6,
+   "post_ratio": 1.07,
+   "pre_ratio": 1.063,
+   "shift": 40.388,
+   "peak_time": 3.7
+  },
+  "walk": {
+   "peak_ratio": 6.968,
+   "burst_secs": 3.0,
+   "post_ratio": 1.102,
+   "pre_ratio": 1.001,
+   "shift": 20.039,
+   "peak_time": 4.2
+  }
+ },
+ "weights_all_data": {
+  "peak_ratio": -0.7914,
+  "burst_secs": 0.499,
+  "post_ratio": -4.974,
+  "pre_ratio": 0.8577,
+  "shift": 0.0025,
+  "peak_time": -0.3377,
+  "bias": 7.1892
+ }
+}
