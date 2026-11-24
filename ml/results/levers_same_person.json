@@ -1,0 +1,47 @@
+{
+ "own_2_examples": {
+  "fall_recall": 0.55,
+  "false_alarm_rate": 0.031,
+  "squat_flagged": 0.075
+ },
+ "own_4_examples": {
+  "fall_recall": 0.55,
+  "false_alarm_rate": 0.017,
+  "squat_flagged": 0.025
+ },
+ "own_6_examples": {
+  "fall_recall": 0.637,
+  "false_alarm_rate": 0.021,
+  "squat_flagged": 0.037
+ },
+ "own_9_examples": {
+  "fall_recall": 0.65,
+  "false_alarm_rate": 0.019,
+  "squat_flagged": 0.025
+ },
+ "own_9_plus_other_people": {
+  "fall_recall": 0.487,
+  "false_alarm_rate": 0.013,
+  "squat_flagged": 0.037
+ },
+ "own_9_rich_features": {
+  "fall_recall": 0.637,
+  "false_alarm_rate": 0.019,
+  "squat_flagged": 0.013
+ },
+ "own_9_rich_plus_other_people": {
+  "fall_recall": 0.588,
+  "false_alarm_rate": 0.004,
+  "squat_flagged": 0.0
+ },
+ "own_9_rich_plus_others_threshold_0.3": {
+  "fall_recall": 0.738,
+  "false_alarm_rate": 0.029,
+  "squat_flagged": 0.025
+ },
+ "own_9_rich_plus_others_threshold_0.5": {
+  "fall_recall": 0.35,
+  "false_alarm_rate": 0.0,
+  "squat_flagged": 0.0
+ }
+}

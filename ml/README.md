@@ -46,6 +46,28 @@ What this means:
   moves, from just 8 example falls each. Across new people it falls apart. So the plan
   is: record our own labeled falls and non-falls in the demo room, and train there.
 
+## What raises accuracy (levers_espfi.py, same person and room, leave one try out)
+
+| Setup | Falls caught | False alarms on other moves |
+|---|---|---|
+| 2 of their own examples per move | 55% | 3% |
+| 4 | 55% | 2% |
+| 6 | 64% | 2% |
+| 9 | 65% | 2% |
+| 9 + other people's data + richer features | 59% | 0.4% |
+| same, alert threshold lowered to 0.3 | 74% | 3% |
+
+- More examples from the room help, and the curve was still rising at 9, so the
+  in-room session records about 30 falls (docs/RECORDING_SESSION.md).
+- Other people's recordings mostly cut false alarms, not missed falls.
+- The alert threshold trades the two: about 74% caught at 3% false alarms.
+- Not testable on this data: a second listener (only one link was recorded) and the
+  "still for 10 s afterwards" check (clips are 9.5 s and everyone ends standing still).
+  Both get measured in the in-room session. The stillness check should cancel moves
+  where the person moves again within seconds (squats, picking something up), but it
+  cannot tell falling from sitting down and staying still. Only the model can do that,
+  which is why the session records 15 sit-downs.
+
 ## Only the real boards can prove
 
 - That our original-ESP32 boards give CSI from the sender's ESP-NOW packets while on
