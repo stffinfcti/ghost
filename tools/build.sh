@@ -16,3 +16,16 @@ for fw in sender listener; do
   cp "$out/ghost_$fw.ino.merged.bin" "$ROOT/web/firmware/$fw/ghost-$fw.bin"
   echo "built $fw: $(stat -c%s "$ROOT/web/firmware/$fw/ghost-$fw.bin") bytes"
 done
+
+# Trim the 0xFF padding at the end of each merged image so the web flasher downloads less.
+for f in web/firmware/*/ghost-*.bin; do
+  python3 - "$f" <<'PY'
+import sys
+p = sys.argv[1]
+d = open(p, 'rb').read()
+n = len(d.rstrip(b'\xff'))
+n = (n + 4095) // 4096 * 4096
+open(p, 'wb').write(d[:n])
+print(p, n, 'bytes')
+PY
+done
