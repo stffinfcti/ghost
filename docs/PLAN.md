@@ -7,7 +7,7 @@ recording in the repo (EvoHacks lessons).
 | When | What | Done when |
 |---|---|---|
 | Nov 24 (done) | Board code, phone page, flasher page, tests on public ESP32 data | both firmwares compile, 6 of 6 scenario tests pass |
-| Boards arrive | Flash both boards from the flasher page, join Wi-Fi, calibrate | the listener page shows packets at about 100 per second |
+| Boards arrive (Nov 24) | Flash both boards, join Wi-Fi, calibrate (docs/FIRST_RUN.md) | the listener page shows packets at about 100 per second |
 | Same day | Walk around vs empty room | motion line clearly jumps when you move. If not, tell me before anything else |
 | Thanksgiving weekend | Recording session 1 (docs/RECORDING_SESSION.md), both listeners | about 100 labeled moves saved |
 | Dec 1 checkpoint | I train on session 1 and report falls caught and false alarms, one listener vs two | if the boards can't tell an empty room from someone moving, we switch to BinGuard |
