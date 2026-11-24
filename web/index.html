@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ghost: fall alerts from Wi-Fi, no camera</title>
+<script type="module" src="https://unpkg.com/esp-web-tools@10.5.2/dist/web/install-button.js?module"></script>
+<style>
+:root{--bg:#0d0f14;--card:#171a22;--txt:#e8eaf0;--mut:#8a90a0;--acc:#7aa2ff;--bad:#ff5c5c}
+body{margin:0;font:16px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--txt)}
+main{max-width:720px;margin:auto;padding:20px}h1{font-size:32px;margin:.2em 0}h2{font-size:20px;margin:.2em 0 .5em}
+.card{background:var(--card);border-radius:14px;padding:18px;margin:14px 0}.mut{color:var(--mut)}
+ol{padding-left:1.2em}li{margin:.3em 0}code{background:#0f1218;padding:1px 5px;border-radius:4px}
+esp-web-install-button button,.btn{background:var(--acc);color:#0d0f14;border:0;border-radius:10px;padding:12px 18px;font-size:16px;font-weight:600;cursor:pointer}
+#live{font-size:28px;font-weight:700;text-align:center;padding:18px;border-radius:12px;background:#2a2d36;margin-top:10px}
+input{background:#0f1218;color:var(--txt);border:1px solid #333;border-radius:8px;padding:10px;font-size:16px;width:60%}
+.warn{color:#f5b942}
+</style></head><body><main>
+<h1>Ghost</h1>
+<p>Two $8 Wi-Fi boards that notice when someone falls and stays down, and text you. No camera, no wearable.
+One board sends a steady Wi-Fi signal, the other listens to how your body bends it.</p>
+
+<div class="card"><h2>1. Flash the boards</h2>
+<p class="mut">Use Chrome or Edge on a computer. Phones can't flash boards. Plug one board in with a USB cable that carries data (some cables only charge).</p>
+<p><esp-web-install-button manifest="firmware/sender/manifest.json">
+  <button slot="activate">Install Sender on this board</button>
+  <span slot="unsupported" class="warn">This browser can't flash boards. Open this page in Chrome or Edge on a computer.</span>
+</esp-web-install-button></p>
+<p>Then unplug it, plug in the second board, and:</p>
+<p><esp-web-install-button manifest="firmware/listener/manifest.json">
+  <button slot="activate">Install Listener on this board</button>
+  <span slot="unsupported" class="warn">This browser can't flash boards. Open this page in Chrome or Edge on a computer.</span>
+</esp-web-install-button></p>
+<p class="mut">No board shows up in the list? It needs a USB driver: CP210x from Silicon Labs or CH340, depending on the small chip next to the USB port. If it still won't connect, hold the BOOT button while you press Install.</p></div>
+
+<div class="card"><h2>2. Put them on your Wi-Fi</h2>
+<ol>
+<li>Power each board from any USB charger.</li>
+<li>On your phone, join the Wi-Fi network called <code>Ghost-sender-…</code>, pick your home Wi-Fi, type its password, Save.</li>
+<li>Do the same for <code>Ghost-listener-…</code>, and give the room a name.</li>
+<li>Your home Wi-Fi must be 2.4 GHz (most routers have both).</li>
+</ol>
+<p class="mut">Hold the BOOT button for 3 seconds to make a board forget its Wi-Fi.</p></div>
+
+<div class="card"><h2>3. Set up the room</h2>
+<ol>
+<li>Put the two boards on opposite sides of the room, about waist height.</li>
+<li>On a phone on the same Wi-Fi, open <code>http://ghost.local</code> (or the address the listener shows).</li>
+<li>Leave the room empty and press <b>Calibrate</b>. It takes 30 seconds.</li>
+<li>Install the free <b>ntfy</b> app and subscribe to the topic shown on that page. Press <b>Send test alert</b> to check.</li>
+</ol></div>
+
+<div class="card"><h2>Watch live from anywhere</h2>
+<p class="mut">Type the topic from the listener page. This shows the room's state over the internet.</p>
+<input id="topic" placeholder="ghost-…"> <button class="btn" onclick="watch()">Watch</button>
+<div id="live">Not watching</div><p id="liveinfo" class="mut"></p></div>
+
+<p class="mut">Ghost is a hackathon project and not a medical device. Don't rely on it as your only safety alert.</p>
+</main>
+<script>
+const NICE={no_signal:'No signal',empty:'Room empty',still:'Someone still',moving:'Someone moving',checking:'Checking…',fall:'Possible fall!'};
+const COL={fall:'#8a1f1f',checking:'#4a3a12',moving:'#24413a',still:'#1d3a2e',empty:'#1c2a3a'};
+let es;
+function watch(){const t=document.getElementById('topic').value.trim();if(!/^ghost-[0-9a-f]{12}$/.test(t)){alert('Topic looks like ghost- followed by 12 letters and numbers');return}
+ if(es)es.close();localStorage.ghostTopic=t;
+ es=new EventSource('https://ntfy.sh/'+t+'-live/sse?since=10m');
+ document.getElementById('live').textContent='Waiting for the board…';
+ es.onmessage=e=>{try{const m=JSON.parse(JSON.parse(e.data).message);const el=document.getElementById('live');
+  el.textContent=(NICE[m.s]||m.s)+(m.room?' · '+m.room:'');el.style.background=COL[m.s]||'#2a2d36';
+  document.getElementById('liveinfo').textContent='Last update '+new Date().toLocaleTimeString()}catch(x){}}}
+if(localStorage.ghostTopic){document.getElementById('topic').value=localStorage.ghostTopic}
+</script></body></html>

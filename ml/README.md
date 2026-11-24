@@ -28,7 +28,7 @@ are no empty-room recordings.
 | Test | Falls caught | Other moves flagged as falls |
 |---|---|---|
 | Movement detected at all (1.6x quiet level) | 98-100% of clips of every activity | n/a |
-| Board's state machine, "burst then still for 3 s" | 66% | squat 76%, arm wave 74%, walk 1% |
+| Board's state machine, "burst then still for 3 s" | 68% | squat 76%, arm wave 74%, walk 1% |
 | Simple 6-number model, new person never seen | 74% | 33% (squat 50%) |
 | Bigger model, new person never seen | 49% | 7% (squat 15%) |
 | Bigger model, same person and room, trained on 8 of their falls | 73% | 1% (squat 2.5%) |
@@ -76,3 +76,11 @@ What this means:
 - That "still on the floor for 10 s" separates falls from standing still, and how
   often it false-alarms over a whole day.
 - Alerts reaching a phone through ntfy.
+
+## Scenario tests (simtest.cpp)
+
+Made-up signals that check the state machine's logic: empty room, walk in and fall,
+squat and get up, walk through and leave, fall then get up later, sit and stay
+still. All 6 pass. They caught a real bug: walking in and then falling used to be
+thrown away as "walking" once the movement lasted over 6 s. The sit-and-stay case
+alerts on purpose, because only the trained model can tell that from a fall.

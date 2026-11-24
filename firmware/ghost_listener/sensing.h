@@ -28,7 +28,7 @@ struct Config {
   float devTh = 0.02f;       // change from the empty-room shape that counts as someone there
   float spikeTh = 0.12f;     // a sudden burst this big might be a fall
   float stillSecs = 10.0f;   // still on the floor this long after a burst -> alert
-  float maxBurstSecs = 6.0f; // bursts longer than this are walking around, not a fall
+  float maxBurstSecs = 6.0f; // kept for settings compatibility; bursts are no longer cut off
   uint8_t modelOn = 0;       // use the trained classifier to veto sit-downs
   float w[NFEAT] = {0, 0, 0, 0, 0, 0};
   float b = 0;
@@ -199,6 +199,9 @@ class Sensor {
   int movingRun = 0, calmRun = 0, absentRun = 0;
   uint32_t evStart = 0, burstEnd = 0, checkStart = 0;
   float evPeak = 0, preDev = 0;
+  static constexpr int PEAK_FRAMES = 30;  // 3 s of frames
+  float peakRing[PEAK_FRAMES] = {0};
+  int peakHead = 0;
   float preProf[NSC], postProfSum[NSC];
   float postDevSum = 0, postMotionSum = 0;
   int postN = 0;
@@ -313,15 +316,20 @@ class Sensor {
           preDev = calmDev;
           memcpy(preProf, calmProf, sizeof(preProf));
           evProb = -1;
+          for (int i = 0; i < PEAK_FRAMES; i++) peakRing[i] = 0;
+          peakRing[0] = shortm;
+          peakHead = 1;
         }
         break;
       case BURST:
-        if (shortm > evPeak) evPeak = shortm;
-        if (t - evStart > (uint32_t)(cfg.maxBurstSecs * 1000)) {
-          evFeat = {evPeak, (t - evStart) / 1000.0f, preDev, dev, 0, motion};
-          logEvent(t, EV_WALKING);
-          phase = IDLE;
-        } else if (calmRun >= 10) {  // a full second of calm ends the burst
+        // Someone can walk in and then fall, so a long burst is not dropped: it keeps
+        // going until a calm second. The peak only counts the last 3 s, so the fall
+        // itself, not the walk before it, sets it. A long burst shows in the duration.
+        peakRing[peakHead] = shortm;
+        peakHead = (peakHead + 1) % PEAK_FRAMES;
+        evPeak = 0;
+        for (int i = 0; i < PEAK_FRAMES; i++) if (peakRing[i] > evPeak) evPeak = peakRing[i];
+        if (calmRun >= 10) {  // a full second of calm ends the burst
           phase = CHECK;
           burstEnd = t - 1000;
           checkStart = t;
