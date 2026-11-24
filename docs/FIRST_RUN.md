@@ -3,7 +3,14 @@
 You need: the boards, 2 USB cables that carry data, a computer with Chrome or Edge,
 your phone, and your home Wi-Fi password. Your Wi-Fi must have a 2.4 GHz network.
 
-## 0. Once: turn on the flasher page
+## 0. Two ways to flash
+- **From a terminal (or Claude Code) on your computer:** `pip install esptool`, then
+  `tools/flash.sh sender` with the first board plugged in and `tools/flash.sh listener`
+  with the second. Add the port if it picks the wrong one, like `tools/flash.sh sender COM3`.
+  Then skip to step 3.
+- **From the browser:** the steps below, once the flasher page is online.
+
+## 0b. Once, for the browser way: turn on the flasher page
 GitHub repo ghost, then Settings, then Pages, then Source: GitHub Actions. After about
 a minute the page is at https://stffinfcti.github.io/ghost/
 
