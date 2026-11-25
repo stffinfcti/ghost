@@ -10,9 +10,16 @@ namespace ghostsense {
 
 constexpr int NSC = 52;        // usable subcarriers in the LLTF part of CSI
 constexpr int WIN = 100;       // packets kept, about 1 s at 100 packets/s
-constexpr int SHORT_WIN = 20;  // about 0.2 s, catches sudden bursts
+constexpr int SHORT_WIN = 20;  // minimum packets before frames are made
 constexpr int PROF_WIN = 50;   // packets averaged into the "shape" of the room
 constexpr uint32_t FRAME_MS = 100;
+// Motion is measured on the room shape (already averaged over PROF_WIN packets), not on
+// single packets: packet-to-packet noise is as big as a person walking, the averaged
+// shape is not. Recorded in a real bedroom (Nov 2026): walking moved it 2-3x the empty
+// level, while the old per-packet measure read the same for empty, typing and walking.
+constexpr int MOT_FRAMES = 20;    // 2 s of frames for "moving"
+constexpr int SPIKE_FRAMES = 10;  // 1 s of frames for sudden bursts
+constexpr int CAL_MAX = 600;      // frames kept while calibrating (60 s)
 constexpr int NFEAT = 6;
 constexpr int NEVENTS = 16;
 
@@ -23,15 +30,19 @@ enum Outcome : uint8_t { EV_WALKING = 0, EV_MOVED_AGAIN = 1, EV_LEFT = 2, EV_MOD
 static const char *const OUTCOME_NAMES[] = {"walking", "moved_again", "left", "model_safe", "fall"};
 
 struct Config {
-  uint32_t version = 2;
-  float motionTh = 0.05f;    // motion level that counts as someone moving
+  uint32_t version = 3;
+  // motionTh and spikeTh are multiples of the room's quiet level, which Ghost keeps
+  // learning by itself, so they work in any room and with any board placement.
+  float motionTh = 1.4f;     // this many times the quiet level counts as someone moving
   float devTh = 0.02f;       // change from the empty-room shape that counts as someone there
-  float spikeTh = 0.12f;     // a sudden burst this big might be a fall
+  float spikeTh = 2.0f;      // a sudden burst this many times the quiet level might be a fall
   float stillSecs = 10.0f;   // still on the floor this long after a burst -> alert
   float maxBurstSecs = 6.0f; // kept for settings compatibility; bursts are no longer cut off
   uint8_t modelOn = 0;       // use the trained classifier to veto sit-downs
   float w[NFEAT] = {0, 0, 0, 0, 0, 0};
   float b = 0;
+  float calFloor = 0;        // quiet level measured by the last good calibration (0 = none)
+  float calFloorShort = 0;   // same for the 1 s measure
 };
 
 // Numbers that describe one burst-then-still event. The classifier reads these.
@@ -93,6 +104,8 @@ class Sensor {
   Event events[NEVENTS];
   int nEvents = 0;
   uint32_t eventsTotal = 0;
+  float floorLevel = 0;            // learned quiet level of the motion measure (0 = not yet)
+  float floorShort = 0;            // same for the 1 s measure the fall logic uses
 
   // Calibration progress, 0..1, or -1 when not calibrating.
   float calibProgress() const {
@@ -104,9 +117,16 @@ class Sensor {
 
   void reset() {
     head = 0; count = 0; lastPktT = 0; seq = 0;
-    phase = IDLE; state = NO_SIGNAL; movingRun = 0; calmRun = 0;
+    phase = IDLE; state = NO_SIGNAL; movingRun = 0; fastRun = 0; calmRun = 0;
     calmInit = false; calmDev = 0;
     for (int k = 0; k < NSC; k++) calmProf[k] = 1;
+    profHead = 0; profCount = 0;
+  }
+
+  // Start from a saved calibration (call after loading cfg from storage).
+  void restoreFloor() {
+    if (cfg.calFloor > 0) floorLevel = cfg.calFloor;
+    if (cfg.calFloorShort > 0) floorShort = cfg.calFloorShort;
   }
 
   void addPacket(uint32_t tMs, int8_t rssi, const uint8_t amp[NSC]) {
@@ -127,10 +147,10 @@ class Sensor {
   void startCalibration(uint32_t secs) {
     calibFrames = secs * 1000 / FRAME_MS / 2;  // first half: room shape, second half: noise levels
     if (calibFrames < 20) calibFrames = 20;
+    if (calibFrames > CAL_MAX / 2) calibFrames = CAL_MAX / 2;
     calibDone = 0;
     calibrating = true;
     memset(calibSum, 0, sizeof(calibSum));
-    sm = ssm = ss = sss = sd = ssd = 0;
   }
 
   void acknowledge() {
@@ -145,15 +165,19 @@ class Sensor {
     if (n < SHORT_WIN || tMs - lastPktT > 2000) {
       state = NO_SIGNAL;
       phase = IDLE;
+      profCount = 0;  // don't mix old room shapes into the motion measure later
       out.motion = out.shortm = out.dev = 0;
       out.rssi = 0; out.rate = 0; out.state = state;
       memset(out.prof, 0, NSC);
       return true;
     }
-    float motion = meanStd(n < WIN ? n : WIN);
-    float shortm = meanStd(SHORT_WIN);
     float prof[NSC];
     profile(n < PROF_WIN ? n : PROF_WIN, prof);
+    memcpy(profRing[profHead], prof, sizeof(prof));
+    profHead = (profHead + 1) % MOT_FRAMES;
+    if (profCount < MOT_FRAMES) profCount++;
+    float motion = profMotion(MOT_FRAMES);
+    float shortm = profMotion(SPIKE_FRAMES);
     float dev = hasBase ? 1.0f - pearson(prof, base, NSC) : 0.0f;
     if (dev < 0) dev = 0;
 
@@ -196,7 +220,7 @@ class Sensor {
   uint32_t lastPktT = 0, seq = 0;
 
   Phase phase = IDLE;
-  int movingRun = 0, calmRun = 0, absentRun = 0;
+  int movingRun = 0, fastRun = 0, calmRun = 0, absentRun = 0;
   uint32_t evStart = 0, burstEnd = 0, checkStart = 0;
   float evPeak = 0, preDev = 0;
   static constexpr int PEAK_FRAMES = 30;  // 3 s of frames
@@ -216,24 +240,55 @@ class Sensor {
   bool calibrating = false;
   uint32_t calibFrames = 0, calibDone = 0;
   float calibSum[NSC];
-  double sm, ssm, ss, sss, sd, ssd;
+  float calM[CAL_MAX], calS[CAL_MAX], calD[CAL_MAX / 2], calTmp[CAL_MAX];
 
-  // Average over subcarriers of each subcarrier's spread over the last m packets.
-  float meanStd(int m) const {
-    if (m > count) m = count;
-    if (m < 2) return 0;
-    float total = 0;
+  float profRing[MOT_FRAMES][NSC];
+  int profHead = 0, profCount = 0;
+
+  static float median(float *a, int n) {  // sorts a in place
+    for (int i = 1; i < n; i++) {
+      float v = a[i];
+      int j = i - 1;
+      while (j >= 0 && a[j] > v) { a[j + 1] = a[j]; j--; }
+      a[j + 1] = v;
+    }
+    return n % 2 ? a[n / 2] : 0.5f * (a[n / 2 - 1] + a[n / 2]);
+  }
+
+  // How much the room shape moved over the last m frames: each subcarrier's spread,
+  // then the median subcarrier. The median ignores the few subcarriers that are always
+  // noisy, and it does not depend on the person standing on the line between the boards.
+  float profMotion(int m) const {
+    if (m > profCount) m = profCount;
+    if (m < 3) return 0;
+    float sp[NSC];
     for (int k = 0; k < NSC; k++) {
       float s = 0, s2 = 0;
       for (int i = 0; i < m; i++) {
-        float v = win[(head - 1 - i + WIN) % WIN][k];
+        float v = profRing[(profHead - 1 - i + MOT_FRAMES) % MOT_FRAMES][k];
         s += v; s2 += v * v;
       }
       float mean = s / m;
       float var = s2 / m - mean * mean;
-      total += var > 0 ? sqrtf(var) : 0;
+      sp[k] = var > 0 ? sqrtf(var) : 0;
     }
-    return total / NSC;
+    return median(sp, NSC);
+  }
+
+  // Follows the quiet level of the motion measure: drops quickly, rises very slowly, so a
+  // person moving around barely lifts it but a noisier room is learned within minutes.
+  static void follow(float &fl, float v, float cal) {
+    if (fl <= 0) fl = v;
+    else fl += (v < fl ? 0.02f : 0.0005f) * (v - fl);
+    if (cal > 0) {  // a good calibration keeps it within sensible bounds
+      if (fl < 0.6f * cal) fl = 0.6f * cal;
+      if (fl > 2.0f * cal) fl = 2.0f * cal;
+    }
+  }
+  void updateFloor(float motion, float shortm) {
+    if (profCount < MOT_FRAMES) return;
+    follow(floorLevel, motion, cfg.calFloor);
+    follow(floorShort, shortm, cfg.calFloorShort);
   }
 
   void profile(int m, float out[NSC]) const {
@@ -247,6 +302,8 @@ class Sensor {
 
   void calibStep(const float prof[NSC], float motion, float shortm) {
     state = EMPTY;
+    calM[calibDone] = motion;
+    calS[calibDone] = shortm;
     if (calibDone < calibFrames) {
       for (int k = 0; k < NSC; k++) calibSum[k] += prof[k];
       calibDone++;
@@ -257,25 +314,26 @@ class Sensor {
       return;
     }
     float dev = 1.0f - pearson(prof, base, NSC);
-    if (dev < 0) dev = 0;
-    sm += motion; ssm += motion * motion;
-    ss += shortm; sss += shortm * shortm;
-    sd += dev; ssd += dev * dev;
+    calD[calibDone - calibFrames] = dev < 0 ? 0 : dev;
     calibDone++;
-    if (calibDone >= calibFrames * 2) {
-      double N = calibFrames;
-      double mM = sm / N, sdM = sqrt(fmax(0.0, ssm / N - mM * mM));
-      double mS = ss / N, sdS = sqrt(fmax(0.0, sss / N - mS * mS));
-      double mD = sd / N, sdD = sqrt(fmax(0.0, ssd / N - mD * mD));
-      // Starting thresholds from the empty room's own noise. Tuned later on real recordings.
-      // Multipliers come from ESP-Fi HAR recordings (ml/README.md): a fall's burst is
-      // only about 2.3x the quiet level, so 1.6x catches 98% of falls there.
-      cfg.motionTh = (float)fmax(fmax(mM * 1.6, mM + 4 * sdM), 0.005);
-      cfg.devTh = (float)fmax(fmax(mD * 3.0, mD + 6 * sdD), 0.004);
-      cfg.spikeTh = (float)fmax(mS * 1.6, mS + 6 * sdS);
-      calibrating = false;
-      phase = IDLE;
-    }
+    if (calibDone < calibFrames * 2) return;
+
+    calibrating = false;
+    phase = IDLE;
+    int nM = calibFrames * 2, nD = calibFrames;
+    float *tmp = calTmp;  // not on the stack: the loop task's stack is small
+    memcpy(tmp, calM, sizeof(float) * nM);
+    float medM = median(tmp, nM);
+    double sd = 0, ssd = 0;
+    for (int i = 0; i < nD; i++) { sd += calD[i]; ssd += calD[i] * calD[i]; }
+    double mD = sd / nD, sdD = sqrt(fmax(0.0, ssd / nD - mD * mD));
+    cfg.devTh = (float)fmax(fmax(mD * 3.0, mD + 6 * sdD), 0.004);
+    memcpy(tmp, calS, sizeof(float) * nM);
+    float medS = median(tmp, nM);
+    cfg.calFloor = medM;
+    cfg.calFloorShort = medS;
+    floorLevel = medM;
+    floorShort = medS;
   }
 
   void logEvent(uint32_t t, uint8_t outcome) {
@@ -290,11 +348,17 @@ class Sensor {
   }
 
   void step(uint32_t t, float motion, float shortm, float dev, const float prof[NSC]) {
-    bool moving = motion >= cfg.motionTh;
-    bool present = hasBase ? dev >= cfg.devTh : true;
-    bool spike = shortm >= cfg.spikeTh;
+    updateFloor(motion, shortm);
+    bool ready = floorLevel > 0 && floorShort > 0;
+    bool moving = ready && motion >= cfg.motionTh * floorLevel;  // steady 2 s view: what the page shows
+    // The fall logic reacts on the 1 s view, so a pause or a getting-up shows within a second.
+    bool fast = ready && shortm >= cfg.motionTh * floorShort;
+    bool spike = ready && shortm >= cfg.spikeTh * floorShort;
     movingRun = moving ? movingRun + 1 : 0;
-    calmRun = moving ? 0 : calmRun + 1;
+    fastRun = fast ? fastRun + 1 : 0;
+    calmRun = fast ? 0 : calmRun + 1;
+
+    bool present = hasBase ? dev >= cfg.devTh : true;
 
     if (!moving) {  // remember what the room looked like while calm
       if (!calmInit) { memcpy(calmProf, prof, sizeof(calmProf)); calmDev = dev; calmInit = true; }
@@ -303,7 +367,7 @@ class Sensor {
     }
 
     if (state == FALL) {
-      if (movingRun >= 15) { state = MOVING; gotUp = true; }  // 1.5 s of movement: they are up
+      if (fastRun >= 15) { state = MOVING; gotUp = true; }  // 1.5 s of movement: they are up
       return;
     }
 
@@ -341,7 +405,7 @@ class Sensor {
         }
         break;
       case CHECK: {
-        if (movingRun >= 5) {  // half a second of movement: they got up or kept going
+        if (fastRun >= 5) {  // half a second of movement: they got up or kept going
           evFeat = makeFeat();
           logEvent(t, EV_MOVED_AGAIN);
           phase = IDLE;

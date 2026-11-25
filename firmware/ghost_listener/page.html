@@ -49,9 +49,9 @@ table{width:100%;font-size:13px;border-collapse:collapse}td{padding:3px 2px;bord
 <div class="card"><details><summary><b>Settings</b></summary>
 <form id="cfg" onsubmit="return saveCfg(event)">
 <label>Room name<input name="room"></label>
-<label>Motion threshold<input name="motionTh" type="number" step="any"></label>
+<label>Motion threshold (times the quiet level)<input name="motionTh" type="number" step="any"></label>
 <label>Room change threshold<input name="devTh" type="number" step="any"></label>
-<label>Burst threshold<input name="spikeTh" type="number" step="any"></label>
+<label>Burst threshold (times the quiet level)<input name="spikeTh" type="number" step="any"></label>
 <label>Seconds still before alert<input name="stillSecs" type="number" step="any"></label>
 <label>Longest fall burst (s)<input name="maxBurstSecs" type="number" step="any"></label>
 <label>Use trained model (0/1)<input name="modelOn" type="number"></label>
@@ -94,9 +94,9 @@ function render(){const s=st.state;$('state').className='s-'+s;$('state').firstC
  $('ev').innerHTML=(st.events||[]).slice().reverse().map(e=>`<tr><td>${new Date(Date.now()-(st.uptime-e.t)).toLocaleTimeString()}</td><td>${e.outcome}</td><td>${e.prob.toFixed(2)}</td></tr>`).join('');
  if(!cfgLoaded&&st.cfg){cfgLoaded=true;const f=$('cfg');for(const k in st.cfg)if(f[k])f[k].value=st.cfg[k];f.room.value=st.room||''}}
 function draw(){const c=$('ch'),g=c.getContext('2d'),W=c.width,H=c.height;g.clearRect(0,0,W,H);
- const cfg=st.cfg||{motionTh:.05,devTh:.02};const top=Math.max(cfg.motionTh*4,...frames.map(f=>f[2]/1e4),...frames.map(f=>f[4]/1e4),.01);
+ const cfg=st.cfg||{motionTh:1.4,devTh:.02};const mLine=cfg.motionTh*(st.floor||0);const top=Math.max(mLine*3,cfg.devTh*2,...frames.map(f=>f[2]/1e4),...frames.map(f=>f[4]/1e4),.01);
  const y=v=>H-4-(v/top)*(H-8),x=i=>i*W/299;
- g.setLineDash([4,4]);g.strokeStyle='#7aa2ff55';g.beginPath();g.moveTo(0,y(cfg.motionTh));g.lineTo(W,y(cfg.motionTh));g.stroke();
+ g.setLineDash([4,4]);g.strokeStyle='#7aa2ff55';g.beginPath();g.moveTo(0,y(mLine));g.lineTo(W,y(mLine));g.stroke();
  g.strokeStyle='#f5b94255';g.beginPath();g.moveTo(0,y(cfg.devTh));g.lineTo(W,y(cfg.devTh));g.stroke();g.setLineDash([]);
  [[2,'#7aa2ff'],[4,'#f5b942']].forEach(([k,col])=>{g.strokeStyle=col;g.lineWidth=2;g.beginPath();
   frames.forEach((f,i)=>i?g.lineTo(x(i),y(f[k]/1e4)):g.moveTo(x(i),y(f[k]/1e4)));g.stroke()});

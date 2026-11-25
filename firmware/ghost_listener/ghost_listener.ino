@@ -137,6 +137,7 @@ static void loadDetector() {
     sensor.hasBase = p.getBool("hasBase", false);
   }
   p.end();
+  sensor.restoreFloor();
 }
 
 // ---------- Wi-Fi capture ----------
@@ -202,6 +203,8 @@ static String stateJson() {
   j += ",\"senderSeen\":" + String(txKnown ? (long)(millis() - lastTxSeen) : -1L);
   j += ",\"csi\":" + String(csiPackets) + ",\"dropped\":" + String(csiDropped);
   j += ",\"calib\":" + num(sensor.calibProgress(), 2) + ",\"hasBase\":" + String(sensor.hasBase ? "true" : "false");
+  // Thresholds are multiples of these learned quiet levels.
+  j += ",\"floor\":" + num(sensor.floorLevel) + ",\"floorShort\":" + num(sensor.floorShort);
   const Config &c = sensor.cfg;
   j += ",\"cfg\":{\"motionTh\":" + num(c.motionTh) + ",\"devTh\":" + num(c.devTh) + ",\"spikeTh\":" + num(c.spikeTh);
   j += ",\"stillSecs\":" + num(c.stillSecs, 1) + ",\"maxBurstSecs\":" + num(c.maxBurstSecs, 1) + ",\"modelOn\":" + String(c.modelOn);
