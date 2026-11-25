@@ -32,7 +32,7 @@ table{width:100%;font-size:13px;border-collapse:collapse}td{padding:3px 2px;bord
 <div class="mut">Each column is a tenth of a second. Brighter means stronger.</div></div>
 
 <div class="card"><b>Set up the room</b>
-<p class="mut">Leave the room empty and still, then press Calibrate. Ghost learns what an empty room looks like.</p>
+<p class="mut">Leave the room empty and still, then press Calibrate. Ghost learns what an empty room looks like. If anyone moves in the room while it runs, Ghost refuses the result and keeps the old one.</p>
 <div class="row"><button class="pri" onclick="calib()">Calibrate (30 s)</button><span id="cal" class="mut"></span></div></div>
 
 <div class="card"><b>Record training data</b>
@@ -90,7 +90,7 @@ function render(){const s=st.state;$('state').className='s-'+s;$('state').firstC
  $('okrow').hidden=s!=='FALL'&&s!=='CHECKING';$('room').textContent=st.room||'';$('topic').textContent=st.topic;
  $('sub').textContent=st.senderSeen<0?'Waiting for the sender board':(st.hasBase?'':'Not calibrated yet');
  $('nums').textContent=st.motion!==undefined?`motion ${st.motion.toFixed(3)} · change ${st.dev.toFixed(3)} · ${st.rate} pkt/s · ${st.rssi} dBm`:'';
- $('cal').textContent=st.calib>0&&st.calib<1?`Calibrating ${(st.calib*100)|0}%... stay out of the room`:(st.hasBase?'Calibrated':'');
+ $('cal').textContent=st.calib>0&&st.calib<1?`Calibrating ${(st.calib*100)|0}%... stay out of the room`:(st.calibResult==='rejected'?'Someone moved during calibration, so it was not used. Leave the room and try again.':(st.hasBase?'Calibrated':''));
  $('recinfo').textContent=rec?`${rec.frames.length} frames, ${rec.labels.length} labels`:'';
  $('diag').textContent=`CSI packets ${st.csi}, dropped ${st.dropped}, uptime ${(st.uptime/1000|0)} s`;
  $('ev').innerHTML=(st.events||[]).slice().reverse().map(e=>`<tr><td>${new Date(Date.now()-(st.uptime-e.t)).toLocaleTimeString()}</td><td>${e.outcome}</td><td>${e.prob.toFixed(2)}</td></tr>`).join('');

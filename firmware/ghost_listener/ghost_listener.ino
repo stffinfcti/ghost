@@ -203,6 +203,8 @@ static String stateJson() {
   j += ",\"senderSeen\":" + String(txKnown ? (long)(millis() - lastTxSeen) : -1L);
   j += ",\"csi\":" + String(csiPackets) + ",\"dropped\":" + String(csiDropped);
   j += ",\"calib\":" + num(sensor.calibProgress(), 2) + ",\"hasBase\":" + String(sensor.hasBase ? "true" : "false");
+  static const char *const CAL_NAMES[] = {"none", "ok", "rejected"};
+  j += ",\"calibResult\":\"" + String(CAL_NAMES[sensor.calibResult]) + "\"";
   // Thresholds are multiples of these learned quiet levels.
   j += ",\"floor\":" + num(sensor.floorLevel) + ",\"floorShort\":" + num(sensor.floorShort);
   const Config &c = sensor.cfg;

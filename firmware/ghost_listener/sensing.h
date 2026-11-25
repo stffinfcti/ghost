@@ -48,6 +48,8 @@ struct Config {
   float calFloorShort = 0;   // same for the 1 s measure
 };
 
+enum CalibResult : int8_t { CAL_NONE = 0, CAL_OK = 1, CAL_REJECTED = 2 };
+
 // Numbers that describe one burst-then-still event. The classifier reads these.
 struct EventFeat {
   float peak;        // biggest short-window motion in the burst
@@ -109,6 +111,7 @@ class Sensor {
   uint32_t eventsTotal = 0;
   float floorLevel = 0;            // learned quiet level of the motion measure (0 = not yet)
   float floorShort = 0;            // same for the 1 s measure the fall logic uses
+  int8_t calibResult = CAL_NONE;   // how the last calibration went
 
   // Calibration progress, 0..1, or -1 when not calibrating.
   float calibProgress() const {
@@ -156,6 +159,8 @@ class Sensor {
     calibDone = 0;
     calibrating = true;
     memset(calibSum, 0, sizeof(calibSum));
+    memcpy(prevBase, base, sizeof(base));
+    prevHasBase = hasBase;
   }
 
   void acknowledge() {
@@ -246,6 +251,8 @@ class Sensor {
   uint32_t calibFrames = 0, calibDone = 0;
   float calibSum[NSC];
   float calM[CAL_MAX], calS[CAL_MAX], calD[CAL_MAX / 2], calTmp[CAL_MAX];
+  float prevBase[NSC];
+  bool prevHasBase = false;
 
   float profRing[MOT_FRAMES][NSC];
   int profHead = 0, profCount = 0;
@@ -330,9 +337,24 @@ class Sensor {
     calibrating = false;
     phase = IDLE;
     int nM = calibFrames * 2, nD = calibFrames;
+    // Someone moving during calibration would set everything too high (the room would
+    // then look "empty" with a person in it). Moments well above the calibration's own
+    // typical level give them away: an empty room has almost none.
     float *tmp = calTmp;  // not on the stack: the loop task's stack is small
     memcpy(tmp, calM, sizeof(float) * nM);
     float medM = median(tmp, nM);
+    int loud = 0;
+    for (int i = 0; i < nM; i++) loud += calM[i] > cfg.motionTh * medM;
+    memcpy(tmp, calD, sizeof(float) * nD);
+    float medD = median(tmp, nD);
+    int shifted = 0;
+    for (int i = 0; i < nD; i++) shifted += calD[i] > 3 * medD + 0.004f;
+    if (loud > nM / 10 || shifted > nD / 10) {
+      memcpy(base, prevBase, sizeof(base));
+      hasBase = prevHasBase;
+      calibResult = CAL_REJECTED;
+      return;
+    }
     double sd = 0, ssd = 0;
     for (int i = 0; i < nD; i++) { sd += calD[i]; ssd += calD[i] * calD[i]; }
     double mD = sd / nD, sdD = sqrt(fmax(0.0, ssd / nD - mD * mD));
@@ -343,6 +365,7 @@ class Sensor {
     cfg.calFloorShort = medS;
     floorLevel = medM;
     floorShort = medS;
+    calibResult = CAL_OK;
   }
 
   void logEvent(uint32_t t, uint8_t outcome) {
