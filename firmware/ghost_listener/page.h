@@ -57,6 +57,8 @@ table{width:100%;font-size:13px;border-collapse:collapse}td{padding:3px 2px;bord
 <label>Seconds still before alert<input name="stillSecs" type="number" step="any"></label>
 <label>Longest fall burst (s)<input name="maxBurstSecs" type="number" step="any"></label>
 <label>Use trained model (0/1)<input name="modelOn" type="number"></label>
+<label>Count someone as here for this long after they move (s)<input name="holdSecs" type="number" step="any"></label>
+<label>Share of the last 10 s with movement that means someone is here<input name="presFrac" type="number" step="any"></label>
 <button class="pri">Save settings</button></form>
 <p><button class="bad" onclick="if(confirm('Forget Wi-Fi and restart?'))post('/api/reset-wifi')">Forget Wi-Fi</button></p>
 <p class="mut" id="diag"></p></details></div>

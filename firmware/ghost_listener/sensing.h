@@ -19,6 +19,7 @@ constexpr uint32_t FRAME_MS = 100;
 // level, while the old per-packet measure read the same for empty, typing and walking.
 constexpr int MOT_FRAMES = 20;    // 2 s of frames for "moving"
 constexpr int SPIKE_FRAMES = 10;  // 1 s of frames for sudden bursts
+constexpr int PRES_FRAMES = 100;  // 10 s of frames for "someone fidgeting here"
 constexpr int CAL_MAX = 600;      // frames kept while calibrating (60 s)
 constexpr int NFEAT = 6;
 constexpr int NEVENTS = 16;
@@ -41,6 +42,8 @@ struct Config {
   uint8_t modelOn = 0;       // use the trained classifier to veto sit-downs
   float w[NFEAT] = {0, 0, 0, 0, 0, 0};
   float b = 0;
+  float holdSecs = 30.0f;    // after someone moves around, count them as present this long
+  float presFrac = 0.15f;    // share of the last 10 s with movement that means someone is here
   float calFloor = 0;        // quiet level measured by the last good calibration (0 = none)
   float calFloorShort = 0;   // same for the 1 s measure
 };
@@ -121,6 +124,8 @@ class Sensor {
     calmInit = false; calmDev = 0;
     for (int k = 0; k < NSC; k++) calmProf[k] = 1;
     profHead = 0; profCount = 0;
+    memset(movHist, 0, sizeof(movHist)); movHead = 0; movCount = 0; movSum = 0;
+    haveSustained = false; lastSustainedT = 0;
   }
 
   // Start from a saved calibration (call after loading cfg from storage).
@@ -244,6 +249,10 @@ class Sensor {
 
   float profRing[MOT_FRAMES][NSC];
   int profHead = 0, profCount = 0;
+  uint8_t movHist[PRES_FRAMES];
+  int movHead = 0, movCount = 0, movSum = 0;
+  bool haveSustained = false;
+  uint32_t lastSustainedT = 0;
 
   static float median(float *a, int n) {  // sorts a in place
     for (int i = 1; i < n; i++) {
@@ -358,7 +367,21 @@ class Sensor {
     fastRun = fast ? fastRun + 1 : 0;
     calmRun = fast ? 0 : calmRun + 1;
 
-    bool present = hasBase ? dev >= cfg.devTh : true;
+    // Someone is here if the room's shape differs from the empty room, or if there was
+    // movement in a good share of the last 10 s (fidgeting, typing), or for a while after
+    // they clearly moved around (sitting still out of the boards' best view).
+    movSum += (int)moving - movHist[movHead];
+    movHist[movHead] = moving;
+    movHead = (movHead + 1) % PRES_FRAMES;
+    if (movCount < PRES_FRAMES) movCount++;
+    if (movingRun >= 10) { haveSustained = true; lastSustainedT = t; }
+    bool shapePresent = hasBase && dev >= cfg.devTh;
+    bool fidgeting = movCount >= 20 && movSum >= cfg.presFrac * movCount;
+    bool recentlyMoved = haveSustained && t - lastSustainedT < (uint32_t)(cfg.holdSecs * 1000);
+    bool present = shapePresent || fidgeting || recentlyMoved;
+    // Deciding "they left" after a burst keeps the old rule (room shape back to empty),
+    // since the hold above would otherwise turn every exit into a fall alert.
+    bool shapeAbsent = hasBase ? !shapePresent : false;
 
     if (!moving) {  // remember what the room looked like while calm
       if (!calmInit) { memcpy(calmProf, prof, sizeof(calmProf)); calmDev = dev; calmInit = true; }
@@ -411,6 +434,11 @@ class Sensor {
           phase = IDLE;
           break;
         }
+        // Not done on purpose: cancelling the check on small fidgets. In a real bedroom
+        // recording, quiet typing showed movement in only ~7% of frames with gaps up to
+        // 30 s, close to an empty room, so such a rule would mostly be noise and could hide
+        // a real fall where the person is breathing hard. Telling sitting down from falling
+        // is the trained model's job (docs/RECORDING_SESSION.md).
         if (t - checkStart <= 2000) {
           postN++; postDevSum += dev; postMotionSum += motion;
           for (int k = 0; k < NSC; k++) postProfSum[k] += prof[k];
@@ -424,7 +452,7 @@ class Sensor {
             break;
           }
         }
-        absentRun = present ? 0 : absentRun + 1;
+        absentRun = shapeAbsent ? absentRun + 1 : 0;
         if (absentRun >= 30) {  // 3 s with nobody there: they left
           evFeat = makeFeat();
           logEvent(t, EV_LEFT);

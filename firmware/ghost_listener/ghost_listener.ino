@@ -208,6 +208,7 @@ static String stateJson() {
   const Config &c = sensor.cfg;
   j += ",\"cfg\":{\"motionTh\":" + num(c.motionTh) + ",\"devTh\":" + num(c.devTh) + ",\"spikeTh\":" + num(c.spikeTh);
   j += ",\"stillSecs\":" + num(c.stillSecs, 1) + ",\"maxBurstSecs\":" + num(c.maxBurstSecs, 1) + ",\"modelOn\":" + String(c.modelOn);
+  j += ",\"holdSecs\":" + num(c.holdSecs, 1) + ",\"presFrac\":" + num(c.presFrac, 2);
   j += ",\"w\":[";
   for (int i = 0; i < NFEAT; i++) j += (i ? "," : "") + num(c.w[i]);
   j += "],\"b\":" + num(c.b) + "}";
@@ -267,6 +268,8 @@ static void setupServer() {
     if (server.hasArg("stillSecs")) c.stillSecs = server.arg("stillSecs").toFloat();
     if (server.hasArg("maxBurstSecs")) c.maxBurstSecs = server.arg("maxBurstSecs").toFloat();
     if (server.hasArg("modelOn")) c.modelOn = server.arg("modelOn").toInt() ? 1 : 0;
+    if (server.hasArg("holdSecs")) c.holdSecs = server.arg("holdSecs").toFloat();
+    if (server.hasArg("presFrac")) c.presFrac = server.arg("presFrac").toFloat();
     for (int i = 0; i < NFEAT; i++) {
       String k = "w" + String(i);
       if (server.hasArg(k)) c.w[i] = server.arg(k).toFloat();
