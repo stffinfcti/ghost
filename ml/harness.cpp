@@ -3,6 +3,7 @@
 //
 // Build: g++ -O2 -std=c++17 -I../firmware/ghost_listener harness.cpp -o harness
 // Run:   ./harness <file.f32> <packets> <ms_per_packet> [motionTh spikeTh stillSecs maxBurstSecs]
+//        (motionTh and spikeTh are multiples of the learned quiet level since config v3)
 // Input: packets x 52 float32 amplitudes. Output on stdout:
 //   F,t,motion,shortm,dev,state            one line per 100 ms frame
 //   E,t,outcome,peak,dur,preDev,postDev,shift,postMotion   one line per finished event
