@@ -331,7 +331,9 @@ class Sensor {
         for (int i = 0; i < PEAK_FRAMES; i++) if (peakRing[i] > evPeak) evPeak = peakRing[i];
         if (calmRun >= 10) {  // a full second of calm ends the burst
           phase = CHECK;
-          burstEnd = t - 1000;
+          // The calm second can start before the burst did (a short spike that never
+          // counted as moving); without this the duration wrapped around to ~4 million s.
+          burstEnd = t - 1000 > evStart ? t - 1000 : evStart;
           checkStart = t;
           postN = 0; postDevSum = 0; postMotionSum = 0; absentRun = 0;
           memset(postProfSum, 0, sizeof(postProfSum));
